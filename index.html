@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<style>
+
+body {
+  font: 10px sans-serif;
+}
+
+.axis path,
+.axis line {
+  fill: none;
+  stroke: #000;
+  shape-rendering: crispEdges;
+}
+
+.x.axis path {
+  display: none;
+}
+
+.line {
+  fill: none;
+  stroke: steelblue;
+  stroke-width: 1.5px;
+}
+
+</style>
+<body>
+<script src="http://d3js.org/d3.v3.js"></script>
+<script>
+
+var margin = {top: 60, right: 60, bottom: 60, left: 60},
+    width = 960 - margin.left - margin.right,
+    height = 500 - margin.top - margin.bottom;
+
+var parseDate = d3.time.format("%d-%b-%y").parse;
+
+var x = d3.time.scale()
+    .range([0, width]);
+
+var y = d3.scale.linear()
+    .range([height, 0]);
+
+var xAxis = d3.svg.axis()
+    .scale(x)
+    .orient("bottom");
+
+var yAxis = d3.svg.axis()
+    .scale(y)
+    .orient("left");
+
+var line = d3.svg.line()
+    .x(function(d) { return x(d.date); })
+    .y(function(d) { return y(d.close); });
+
+var svg = d3.select("body").append("svg")
+    .attr("width", width + margin.left + margin.right)
+    .attr("height", height + margin.top + margin.bottom)
+  .append("g")
+    .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+d3.csv("survival_rates.csv", function(error, cancers) {
+  cancers.forEach(function(d) {
+    d.columns = Object.keys(d);
+    d.rates = [+d["Five"], +d["Ten"], +d["Fifteen"], +d["Twenty"]];
+    d.relative_rates = [];
+    d.lines = [];
+    for (i = 0; i < d.rates.length; i++) {
+      d.relative_rates.push(d.rates[i]-d.rates[0]);
+      if (i > 0) d.lines.push([d.relative_rates[i-1], d.relative_rates[i]]);
+    }
+  });
+
+  console.log(cancers);
+
+  var plots = svg.selectAll("g")
+    .data(cancers)
+  .enter().append("g").attr("transform", function(d, i) {
+     return "translate(60, " + (i*50) + ")"; 
+  })
+
+  svg.selectAll(".headers")
+  .data(cancers[0].columns.slice(1))
+  .enter().append("text")
+  .text(function (d, i) {
+    return d;
+  })
+  .attr("x", function (d, i) {
+    return 60+15+(i*100);
+  })
+  .attr("y", function (d, i) {
+    return -30;
+  })
+  .attr("text-anchor", "middle");
+
+  plots.append("text")
+  .text(function (d, i) {
+    return d["Type"];
+  })
+  .attr("x", function (d, i) {
+    return -60;
+  })
+  .attr("y", function (d, i) {
+    return 3;
+  });
+
+  plots.selectAll(".rates")
+  .data(function(d, i) {
+    return d3.zip(d.rates, d.relative_rates); 
+  }).enter()
+  .append("text")
+  .text(function(d) {  
+    return d[0];
+  })
+  .attr("x", function (d, i) {
+    return (i*100)+15;
+  })
+  .attr("y", function (d, i) {
+    return -d[1]+4;
+  })
+  .attr("text-anchor", "middle");
+
+  svg.selectAll("text")
+  .attr("font-family", "Gill Sans")
+  .attr("font-size", "12");
+
+  plots.selectAll("line")
+  .data(function(d, i) {
+    return d.lines; 
+  }).enter()
+  .append("line")
+    .attr("stroke", "red")
+    .attr("x1", function (d, i) {
+      return (i*100)+30;
+    })
+    .attr("y1", function (d, i) {
+      return -d[0];
+    })
+    .attr("x2", function (d, i) {
+      return (i*100)+100;
+    })
+    .attr("y2", function(d) {
+      return -d[1];
+    })
+    .attr("stroke", "#ccc")
+});
+
+</script>
