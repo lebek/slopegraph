@@ -2,55 +2,72 @@
 <meta charset="utf-8">
 <style>
 
-body {
-  font: 10px sans-serif;
-}
+  body {
+    font-family: "Gill Sans";
+    color: #333;
+    font-size: 14px;
+  }
 
-.axis path,
-.axis line {
-  fill: none;
-  stroke: #000;
-  shape-rendering: crispEdges;
-}
+  a {
+    color: #000;
+  }
 
-.x.axis path {
-  display: none;
-}
+  strong {
+    font-weight: 600;
+    color: #000;
+  }
 
-.line {
-  fill: none;
-  stroke: steelblue;
-  stroke-width: 1.5px;
-}
+  svg {
+    float: left;
+  }
+
+  .rate {
+    text-anchor: middle;
+  }
+
+  .line {
+    stroke: #ccc;
+  }
+
+  .docs {
+    width: 200px;
+    display: inline-block;
+    line-height: 25px;
+    margin-top: 60px;
+  }
+
+  .title {
+    text-anchor: middle;
+    font-size: 18px;
+  }
+
+  text {
+    font-family: "Gill Sans";
+    fill: #333;
+    font-size: 14px;
+  }
 
 </style>
 <body>
+
+<div class="docs">
+  <p>
+    <strong>Source</strong> Hermann Brenner, "<a href="http://www.thelancet.com/journals/lancet/article/PIIS0140-6736(02)11199-8/abstract">Long-term survival rates of cancer patients achieved by the end of the 20th century: a period analysis</a>," The Lancet, 360 (October 12, 2002), 1131-1135.
+  </p>
+  <p><a href="survival_rates.csv">Original data set</a></p>
+  <p>Graphed by <a href="http://twitter.com/_lebek">Peter Le Bek</a>.</p>
+</div>
+
 <script src="http://d3js.org/d3.v3.js"></script>
 <script>
 
-var margin = {top: 60, right: 60, bottom: 60, left: 60},
-    width = 960 - margin.left - margin.right,
-    height = 500 - margin.top - margin.bottom;
+var margin = {top: 120, right: 60, bottom: 60, left: 60},
+    width = 600 - margin.left - margin.right,
+    height = 1400 - margin.top - margin.bottom;
 
-var parseDate = d3.time.format("%d-%b-%y").parse;
-
-var x = d3.time.scale()
-    .range([0, width]);
-
-var y = d3.scale.linear()
-    .range([height, 0]);
-
-var xAxis = d3.svg.axis()
-    .scale(x)
-    .orient("bottom");
-
-var yAxis = d3.svg.axis()
-    .scale(y)
-    .orient("left");
-
-var line = d3.svg.line()
-    .x(function(d) { return x(d.date); })
-    .y(function(d) { return y(d.close); });
+var y_scale = d3.scale.linear()
+                .domain([0, 100])
+                .range([0, 400]);
 
 var svg = d3.select("body").append("svg")
     .attr("width", width + margin.left + margin.right)
@@ -59,24 +76,48 @@ var svg = d3.select("body").append("svg")
     .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
 
 d3.csv("survival_rates.csv", function(error, cancers) {
-  cancers.forEach(function(d) {
+  cancers.sort(function(a, b) { return d3.descending(+a["5 year"], +b["5 year"]); });
+
+  cancers.forEach(function(d, j) {
     d.columns = Object.keys(d);
-    d.rates = [+d["Five"], +d["Ten"], +d["Fifteen"], +d["Twenty"]];
+    d.rates = [+d["5 year"], +d["10 year"], +d["15 year"], +d["20 year"]];
     d.relative_rates = [];
     d.lines = [];
     for (i = 0; i < d.rates.length; i++) {
       d.relative_rates.push(d.rates[i]-d.rates[0]);
       if (i > 0) d.lines.push([d.relative_rates[i-1], d.relative_rates[i]]);
     }
+
+    if (j > 0) {
+      var last = cancers[j-1].relative_rates;
+      var current = d.relative_rates;
+      var min = Infinity;
+      for (k = 0; k < last.length; k++) {
+        var diff  = last[k]-current[k];
+        if (diff < min) {
+          min = diff;
+        }
+      }
+
+      d.y_offset = y_scale(Math.abs(min)) + cancers[j-1].y_offset + 25;
+    } else {
+      d.y_offset = 0;
+    }
   });
 
-  console.log(cancers);
+  //console.log(cancers);
 
   var plots = svg.selectAll("g")
     .data(cancers)
   .enter().append("g").attr("transform", function(d, i) {
-     return "translate(60, " + (i*50) + ")"; 
-  })
+    return "translate(140, " + d.y_offset + ")"; 
+  });
+
+  svg.append("text").attr("class", "title")
+  .text("Estimates of % survival rates")
+  .attr("x", 140+15+((cancers[0].lines.length/2.0)*100))
+  .attr("y", -80);
+
 
   svg.selectAll(".headers")
   .data(cancers[0].columns.slice(1))
@@ -85,7 +126,7 @@ d3.csv("survival_rates.csv", function(error, cancers) {
     return d;
   })
   .attr("x", function (d, i) {
-    return 60+15+(i*100);
+    return 140+15+(i*100);
   })
   .attr("y", function (d, i) {
     return -30;
@@ -97,17 +138,18 @@ d3.csv("survival_rates.csv", function(error, cancers) {
     return d["Type"];
   })
   .attr("x", function (d, i) {
-    return -60;
+    return -140;
   })
   .attr("y", function (d, i) {
     return 3;
   });
 
-  plots.selectAll(".rates")
+  plots.selectAll(".rate")
   .data(function(d, i) {
     return d3.zip(d.rates, d.relative_rates); 
   }).enter()
   .append("text")
+  .attr("class", "rate")
   .text(function(d) {  
     return d[0];
   })
@@ -115,33 +157,27 @@ d3.csv("survival_rates.csv", function(error, cancers) {
     return (i*100)+15;
   })
   .attr("y", function (d, i) {
-    return -d[1]+4;
-  })
-  .attr("text-anchor", "middle");
+    return y_scale(-d[1])+5;
+  });
 
-  svg.selectAll("text")
-  .attr("font-family", "Gill Sans")
-  .attr("font-size", "12");
-
-  plots.selectAll("line")
+  plots.selectAll(".line")
   .data(function(d, i) {
     return d.lines; 
   }).enter()
   .append("line")
-    .attr("stroke", "red")
+  .attr("class", "line")
     .attr("x1", function (d, i) {
       return (i*100)+30;
     })
     .attr("y1", function (d, i) {
-      return -d[0];
+      return y_scale(-d[0]);
     })
     .attr("x2", function (d, i) {
       return (i*100)+100;
     })
     .attr("y2", function(d) {
-      return -d[1];
-    })
-    .attr("stroke", "#ccc")
+      return y_scale(-d[1]);
+    });
 });
 
 </script>
